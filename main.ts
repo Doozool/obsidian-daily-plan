@@ -69,7 +69,7 @@ export default class DailyPlanPlugin extends Plugin {
     const dayName = DAY_NAMES[today.getDay()];
     const heading = `### ${dateStr} ${dayName}`;
 
-    const template = `${heading}\n\n\`\`\`daily-plan\ntasks:\n  - name: ""\n    start: ""\n    end: ""\n    done: N\n\`\`\`\n`;
+    const template = `${heading}\n\n\`\`\`daily-plan\ntasks:\n  - name: ""\n    start: ""\n    end: ""\n    done: ""\n\`\`\`\n`;
 
     const cursor = editor.getCursor();
     editor.replaceRange(template, cursor);
@@ -85,9 +85,8 @@ export default class DailyPlanPlugin extends Plugin {
    * Format Date as YYYY-MM-DD.
    */
   private formatDate(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const m = d.getMonth() + 1;
     const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return `${m}.${day}`;
   }
 }

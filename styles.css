@@ -84,8 +84,17 @@
 }
 
 .done-badge.is-undone {
+  color: #fff;
+  background: var(--color-red, #e74c3c);
+}
+
+.done-badge.is-idle {
   color: var(--text-muted);
-  background: var(--background-modifier-hover);
+  background: transparent;
+  border: 1px dashed var(--text-faint);
+  min-width: 20px;
+  min-height: 20px;
+  display: inline-block;
 }
 
 .done-badge:hover {
@@ -136,10 +145,6 @@
 
 /* ── Time Picker Popup ── */
 .time-picker-popup {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
   background: var(--background-primary);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -205,4 +210,24 @@
 
 .time-picker-confirm-btn:hover {
   opacity: 0.85;
+}
+
+/* ── Total row ── */
+.total-row td {
+  border-bottom: 2px solid var(--table-border-color, #ccc);
+  font-weight: 600;
+  padding: 6px 8px;
+}
+
+.total-label {
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.total-duration {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  font-size: 14px;
 }

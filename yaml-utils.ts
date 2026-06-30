@@ -17,7 +17,7 @@ export function parseDailyPlanYaml(source: string): Task[] {
         name: typeof t.name === "string" ? t.name : "",
         start: typeof t.start === "string" ? t.start : "",
         end: typeof t.end === "string" ? t.end : "",
-        done: t.done === "Y" ? "Y" : "N",
+        done: t.done === "Y" ? "Y" : t.done === "N" ? "N" : "",
       }));
     }
     return [];
@@ -38,8 +38,11 @@ export function serializeDailyPlanYaml(tasks: Task[]): string {
     quotingType: '"',
     forceQuotes: false,
   });
-  // Remove the leading "tasks:" line's trailing newline for clean look
-  return yaml.trimEnd();
+  // Ensure the YAML ends with a newline so the closing ``` starts on its own line
+  let result = yaml.trimEnd() + "\n";
+  // Unquote Y/N values on the done field for cleaner output
+  result = result.replace(/done: "([YN])"/g, "done: $1");
+  return result;
 }
 
 /**
@@ -71,11 +74,21 @@ export function findCodeBlockRange(editor: Editor): {
 
 /**
  * Replace the content inside the first ```daily-plan code block
- * with the given YAML string.
+ * with the given YAML string, then scroll the block back into view.
  */
 export function updateCodeBlock(editor: Editor, newYaml: string): void {
   const range = findCodeBlockRange(editor);
   if (!range) return;
 
   editor.replaceRange(newYaml, range.start, range.end);
+
+  // Re-find the block after replacement (positions may shift slightly)
+  // and scroll it into view to prevent the view from jumping upward.
+  const newRange = findCodeBlockRange(editor);
+  if (newRange) {
+    editor.scrollIntoView(
+      { from: newRange.start, to: newRange.start },
+      true
+    );
+  }
 }

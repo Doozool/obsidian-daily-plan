@@ -1,6 +1,6 @@
 {
   "name": "obsidian-daily-plan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Interactive daily planning table for Obsidian",
   "main": "main.js",
   "scripts": {

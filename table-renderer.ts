@@ -1,10 +1,9 @@
 import type { Task } from "./types";
-import { computeDuration, getCurrentTime } from "./time-utils";
+import { computeDuration, computeTotalDuration, getCurrentTime } from "./time-utils";
 
 /**
  * Build an interactive daily-plan table inside `container`.
  * Every mutation calls `onChange(tasks)` so the caller can persist.
- * Returns the table element so the caller can track it.
  */
 export function renderTable(
   container: HTMLElement,
@@ -15,6 +14,14 @@ export function renderTable(
   container.empty();
 
   const table = container.createEl("table", { cls: "daily-plan-table" });
+
+  // Prevent Obsidian from intercepting clicks/keys inside our table
+  table.addEventListener("mousedown", (e: MouseEvent) => {
+    e.stopPropagation();
+  });
+  table.addEventListener("keydown", (e: KeyboardEvent) => {
+    e.stopPropagation();
+  });
 
   // --- Header ---
   const thead = table.createEl("thead");
@@ -31,16 +38,24 @@ export function renderTable(
       attr: { "data-index": String(index) },
     });
 
-    // 1. Task name — contenteditable
+    // 1. Task name — contenteditable, Enter=blur, no newlines
     const nameCell = row.createEl("td", { cls: "name-cell" });
     nameCell.setAttr("contenteditable", "true");
     nameCell.setText(task.name);
-    nameCell.addEventListener("keydown", (e: KeyboardEvent) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        nameCell.blur();
-      }
-    });
+
+    // Capture phase to beat Obsidian's own key handlers
+    nameCell.addEventListener(
+      "keydown",
+      (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          nameCell.blur();
+        }
+      },
+      true // capture phase
+    );
+
     nameCell.addEventListener("blur", () => {
       const newName = nameCell.getText().trim();
       if (newName !== task.name) {
@@ -49,24 +64,26 @@ export function renderTable(
       }
     });
 
-    // 2. Start time
+    // 2. Start time — click opens popup
     const startCell = row.createEl("td", {
       cls: "time-cell",
       text: task.start || "—",
     });
-    startCell.addEventListener("click", () => {
+    startCell.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
       showTimePickerPopup(startCell, task.start, (val) => {
         task.start = val;
         onChange(tasks);
       });
     });
 
-    // 3. End time
+    // 3. End time — click opens popup
     const endCell = row.createEl("td", {
       cls: "time-cell",
       text: task.end || "—",
     });
-    endCell.addEventListener("click", () => {
+    endCell.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
       showTimePickerPopup(endCell, task.end, (val) => {
         task.end = val;
         onChange(tasks);
@@ -77,16 +94,28 @@ export function renderTable(
     const dur = computeDuration(task.start, task.end);
     row.createEl("td", { cls: "duration-cell", text: dur || "—" });
 
-    // 5. Done toggle
+    // 5. Done toggle — logic depends on whether duration exists
     const doneCell = row.createEl("td", { cls: "done-cell" });
-    const badge = doneCell.createEl("span", {
-      cls: `done-badge ${task.done === "Y" ? "is-done" : "is-undone"}`,
-      text: task.done === "Y" ? "✓" : "○",
-    });
-    badge.addEventListener("click", () => {
-      task.done = task.done === "Y" ? "N" : "Y";
-      onChange(tasks);
-    });
+    const hasDuration = dur !== null;
+
+    if (!hasDuration) {
+      // No times filled → dashed empty circle, non-interactive
+      const badge = doneCell.createEl("span", {
+        cls: "done-badge is-idle",
+      });
+    } else {
+      // Has duration → toggle between ✓ and ✕
+      const isDone = task.done === "Y";
+      const badge = doneCell.createEl("span", {
+        cls: `done-badge ${isDone ? "is-done" : "is-undone"}`,
+        text: isDone ? "✓" : "✕",
+      });
+      badge.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        task.done = task.done === "Y" ? "N" : "Y";
+        onChange(tasks);
+      });
+    }
 
     // 6. Delete button
     const delCell = row.createEl("td", { cls: "action-cell" });
@@ -95,7 +124,8 @@ export function renderTable(
       text: "×",
       attr: { title: "删除此任务" },
     });
-    delBtn.addEventListener("click", () => {
+    delBtn.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
       tasks.splice(index, 1);
       onChange(tasks);
     });
@@ -106,16 +136,27 @@ export function renderTable(
   // Build initial rows
   tasks.forEach((task, idx) => buildRow(task, idx));
 
-  // --- Footer: add-row button ---
+  // --- Footer: total duration + add-row button ---
   const tfoot = table.createEl("tfoot");
-  const footRow = tfoot.createEl("tr");
-  const addCell = footRow.createEl("td", { attr: { colspan: "6" } });
+
+  // Total row
+  const totalRow = tfoot.createEl("tr", { cls: "total-row" });
+  totalRow.createEl("td", { attr: { colspan: "3" }, cls: "total-label", text: "总计" });
+  totalRow.createEl("td", { cls: "total-duration", text: computeTotalDuration(tasks) || "—" });
+  // Empty cells for done + action columns
+  totalRow.createEl("td");
+  totalRow.createEl("td");
+
+  // Add-row button row
+  const addRow = tfoot.createEl("tr");
+  const addCell = addRow.createEl("td", { attr: { colspan: "6" } });
   const addBtn = addCell.createEl("button", {
     cls: "add-row-btn",
     text: "+ 添加任务",
   });
-  addBtn.addEventListener("click", () => {
-    tasks.push({ name: "", start: "", end: "", done: "N" });
+  addBtn.addEventListener("click", (e: MouseEvent) => {
+    e.stopPropagation();
+    tasks.push({ name: "", start: "", end: "", done: "" });
     onChange(tasks);
   });
 
@@ -123,27 +164,29 @@ export function renderTable(
 }
 
 // ---------------------------------------------------------------------------
-// Time-picker popup
+// Time-picker popup (attached to document.body to avoid clipping)
 // ---------------------------------------------------------------------------
 
-/**
- * Show a small popup anchored inside `cell` so the user can pick a time.
- * Offers a "fill current time" button and a manual HH:mm input.
- */
 function showTimePickerPopup(
   cell: HTMLElement,
   currentValue: string,
   onSelect: (time: string) => void
 ): void {
-  // Remove any existing popup
   closeOpenPicker();
 
-  const popup = cell.createEl("div", { cls: "time-picker-popup" });
+  const popup = document.body.createEl("div", { cls: "time-picker-popup" });
+
+  // Position the popup near the cell
+  const rect = cell.getBoundingClientRect();
+  popup.style.position = "fixed";
+  popup.style.top = rect.bottom + 4 + "px";
+  popup.style.left = rect.left + "px";
+  popup.style.zIndex = "1000";
 
   // "Fill current time" button
   const nowBtn = popup.createEl("button", {
     cls: "time-picker-now-btn",
-    text: "🕐 填入当前时间",
+    text: "填入当前时间",
   });
   nowBtn.addEventListener("click", (e: MouseEvent) => {
     e.stopPropagation();
@@ -200,7 +243,6 @@ function showTimePickerPopup(
   }, 0);
 }
 
-/** Remove the currently open time-picker popup if any. */
 function closeOpenPicker(): void {
   const existing = document.querySelector(".time-picker-popup");
   if (existing) existing.remove();

@@ -41,3 +41,28 @@ export function computeDuration(start: string, end: string): string | null {
   if (hours > 0) return `${hours}h`;
   return `${minutes}m`;
 }
+
+/**
+ * Sum durations across all tasks that have valid start/end times.
+ * Returns a human-readable total, or null if no valid durations exist.
+ */
+export function computeTotalDuration(tasks: Array<{ start: string; end: string }>): string | null {
+  let totalMinutes = 0;
+
+  for (const t of tasks) {
+    if (!t.start || !t.end) continue;
+    const startMin = parseMinutes(t.start);
+    const endMin = parseMinutes(t.end);
+    if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin) continue;
+    totalMinutes += endMin - startMin;
+  }
+
+  if (totalMinutes <= 0) return null;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
+}

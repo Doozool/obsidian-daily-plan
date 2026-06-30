@@ -2,7 +2,7 @@ export interface Task {
   name: string;
   start: string;
   end: string;
-  done: "Y" | "N";
+  done: "Y" | "N" | "";
 }
 
 export interface DailyPlanData {
