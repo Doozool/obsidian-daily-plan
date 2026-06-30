@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-daily-plan",
+  "name": "Daily Plan",
+  "version": "1.0.0",
+  "minAppVersion": "1.5.0",
+  "description": "Interactive daily planning table inside Markdown notes",
+  "author": "Your Name",
+  "isDesktopOnly": false
+}
