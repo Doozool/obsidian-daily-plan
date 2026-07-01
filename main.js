@@ -3449,30 +3449,32 @@ function renderTable(container, tasks, onChange) {
           });
         }
       }
-      const noteSpan = durCell.createEl("span", {
-        cls: "session-note",
-        text: session.note || "",
-        attr: { "data-placeholder": "\u5907\u6CE8\u2026" }
-      });
-      noteSpan.setAttr("contenteditable", "true");
-      noteSpan.addEventListener(
-        "keydown",
-        (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.stopPropagation();
-            noteSpan.blur();
+      if (sessionCount > 1) {
+        const noteSpan = durCell.createEl("span", {
+          cls: "session-note",
+          text: session.note || "",
+          attr: { "data-placeholder": "\u5907\u6CE8\u2026" }
+        });
+        noteSpan.setAttr("contenteditable", "true");
+        noteSpan.addEventListener(
+          "keydown",
+          (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              noteSpan.blur();
+            }
+          },
+          true
+        );
+        noteSpan.addEventListener("blur", () => {
+          const newNote = noteSpan.getText().trim();
+          if (newNote !== session.note) {
+            session.note = newNote;
+            onChange(tasks);
           }
-        },
-        true
-      );
-      noteSpan.addEventListener("blur", () => {
-        const newNote = noteSpan.getText().trim();
-        if (newNote !== session.note) {
-          session.note = newNote;
-          onChange(tasks);
-        }
-      });
+        });
+      }
       if (sessIdx === 0) {
         const doneCell = row.createEl("td", {
           cls: "done-cell",

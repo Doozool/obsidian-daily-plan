@@ -131,31 +131,33 @@ export function renderTable(
         }
       }
 
-      // Note — click to edit
-      const noteSpan = durCell.createEl("span", {
-        cls: "session-note",
-        text: session.note || "",
-        attr: { "data-placeholder": "备注…" },
-      });
-      noteSpan.setAttr("contenteditable", "true");
-      noteSpan.addEventListener(
-        "keydown",
-        (e: KeyboardEvent) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            e.stopPropagation();
-            noteSpan.blur();
+      // Note — only show when task has multiple sessions
+      if (sessionCount > 1) {
+        const noteSpan = durCell.createEl("span", {
+          cls: "session-note",
+          text: session.note || "",
+          attr: { "data-placeholder": "备注…" },
+        });
+        noteSpan.setAttr("contenteditable", "true");
+        noteSpan.addEventListener(
+          "keydown",
+          (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              noteSpan.blur();
+            }
+          },
+          true
+        );
+        noteSpan.addEventListener("blur", () => {
+          const newNote = noteSpan.getText().trim();
+          if (newNote !== session.note) {
+            session.note = newNote;
+            onChange(tasks);
           }
-        },
-        true
-      );
-      noteSpan.addEventListener("blur", () => {
-        const newNote = noteSpan.getText().trim();
-        if (newNote !== session.note) {
-          session.note = newNote;
-          onChange(tasks);
-        }
-      });
+        });
+      }
 
       // ── 5. Done badge (rowspan across sessions) ──
       if (sessIdx === 0) {
