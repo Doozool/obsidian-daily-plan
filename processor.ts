@@ -38,19 +38,9 @@ export function createDailyPlanProcessor(
       const editor = app.workspace.activeEditor?.editor;
       if (!editor) return;
 
-      // Save scroll position to prevent view jump
-      const scrollY = window.scrollY;
-
       // Serialize and write back
       const newYaml = serializeDailyPlanYaml(tasks);
       updateCodeBlock(editor, newYaml);
-
-      // Double rAF waits for full layout + paint cycle before restoring scroll
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollY);
-        });
-      });
     });
 
     // Register as a MarkdownRenderChild so Obsidian manages lifecycle

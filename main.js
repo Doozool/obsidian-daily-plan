@@ -3278,6 +3278,13 @@ function updateCodeBlock(editor, newYaml) {
   if (!range)
     return;
   editor.replaceRange(newYaml, range.start, range.end);
+  const newRange = findCodeBlockRange(editor);
+  if (newRange) {
+    editor.scrollIntoView(
+      { from: newRange.start, to: newRange.start },
+      true
+    );
+  }
 }
 
 // time-utils.ts
@@ -3624,14 +3631,8 @@ function createDailyPlanProcessor(app) {
       const editor = app.workspace.activeEditor?.editor;
       if (!editor)
         return;
-      const scrollY = window.scrollY;
       const newYaml = serializeDailyPlanYaml(tasks);
       updateCodeBlock(editor, newYaml);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.scrollTo(0, scrollY);
-        });
-      });
     });
     const child = new import_obsidian2.MarkdownRenderChild(table);
     ctx.addChild(child);
