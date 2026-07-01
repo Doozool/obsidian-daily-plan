@@ -24,7 +24,7 @@
 
 /* ── Name cell (editable) ── */
 .name-cell {
-  width: 160px;
+  width: 170px;
   cursor: text;
   border-radius: 3px;
   transition: background 0.15s;
@@ -45,11 +45,14 @@
 .time-cell {
   cursor: pointer;
   min-width: 70px;
+  max-width: 100px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   border-radius: 3px;
   position: relative;
   transition: background 0.15s;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .time-cell:hover {
@@ -62,6 +65,9 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
   min-width: 70px;
+  max-width: 100px;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .dur-text {
@@ -106,6 +112,7 @@
 .done-cell {
   text-align: center;
   min-width: 50px;
+  max-width: 70px;
 }
 
 .done-badge {
@@ -145,6 +152,7 @@
 .action-cell {
   text-align: center;
   min-width: 40px;
+  max-width: 60px;
   white-space: nowrap;
 }
 
