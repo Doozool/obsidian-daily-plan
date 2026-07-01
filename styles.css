@@ -24,14 +24,12 @@
 
 /* ── Name cell (editable) ── */
 .name-cell {
-  min-width: 140px;
-  max-width: 220px;
+  width: 140px;
   cursor: text;
   border-radius: 3px;
   transition: background 0.15s;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .name-cell:hover {
