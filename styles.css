@@ -24,7 +24,7 @@
 
 /* ── Name cell (editable) ── */
 .name-cell {
-  width: 140px;
+  width: 160px;
   cursor: text;
   border-radius: 3px;
   transition: background 0.15s;
