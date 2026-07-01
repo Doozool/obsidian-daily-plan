@@ -59,7 +59,45 @@
   text-align: center;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  min-width: 60px;
+  min-width: 70px;
+}
+
+.dur-text {
+  display: block;
+  font-size: 13px;
+}
+
+.dur-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+/* ── Session note ── */
+.session-note {
+  display: block;
+  font-size: 10px;
+  color: var(--text-faint);
+  cursor: text;
+  min-width: 30px;
+  border-radius: 2px;
+  transition: background 0.15s;
+  font-variant-numeric: normal;
+}
+
+.session-note:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-faint);
+}
+
+.session-note:hover {
+  background: var(--background-modifier-hover);
+}
+
+.session-note:focus {
+  background: var(--background-modifier-hover);
+  outline: 1px solid var(--interactive-accent);
+  color: var(--text-muted);
 }
 
 /* ── Done cell ── */
@@ -104,7 +142,8 @@
 /* ── Action buttons ── */
 .action-cell {
   text-align: center;
-  min-width: 30px;
+  min-width: 40px;
+  white-space: nowrap;
 }
 
 .delete-session-btn {
@@ -124,26 +163,22 @@
   background: var(--background-modifier-hover);
 }
 
-/* ── Add session button ── */
-.add-session-row td {
-  padding: 2px 8px;
-  border-bottom: 1px dashed var(--table-border-color, #e0e0e0);
-}
-
+/* ── Inline add-session button (inside action cell) ── */
 .add-session-btn {
-  width: 100%;
   background: none;
   border: none;
   cursor: pointer;
-  padding: 3px;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--text-faint);
+  padding: 0 3px;
+  border-radius: 3px;
+  line-height: 1;
   transition: all 0.15s;
-  text-align: left;
 }
 
 .add-session-btn:hover {
   color: var(--interactive-accent);
+  background: var(--background-modifier-hover);
 }
 
 /* ── Add row button ── */

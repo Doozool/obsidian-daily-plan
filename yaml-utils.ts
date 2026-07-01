@@ -21,6 +21,7 @@ export function parseDailyPlanYaml(source: string): Task[] {
           sessions = (t.sessions as Record<string, unknown>[]).map((s) => ({
             start: typeof s.start === "string" ? s.start : "",
             end: typeof s.end === "string" ? s.end : "",
+            note: typeof s.note === "string" ? s.note : "",
           }));
         } else if (typeof t.start === "string" || typeof t.end === "string") {
           // Old format: migrate single start/end to sessions
@@ -28,13 +29,14 @@ export function parseDailyPlanYaml(source: string): Task[] {
             {
               start: typeof t.start === "string" ? t.start : "",
               end: typeof t.end === "string" ? t.end : "",
+              note: "",
             },
           ];
         }
 
         // Ensure at least one empty session
         if (sessions.length === 0) {
-          sessions = [{ start: "", end: "" }];
+          sessions = [{ start: "", end: "", note: "" }];
         }
 
         let done: "Y" | "N" | "";

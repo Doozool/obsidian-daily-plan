@@ -3214,18 +3214,20 @@ function parseDailyPlanYaml(source) {
         if (Array.isArray(t.sessions)) {
           sessions = t.sessions.map((s) => ({
             start: typeof s.start === "string" ? s.start : "",
-            end: typeof s.end === "string" ? s.end : ""
+            end: typeof s.end === "string" ? s.end : "",
+            note: typeof s.note === "string" ? s.note : ""
           }));
         } else if (typeof t.start === "string" || typeof t.end === "string") {
           sessions = [
             {
               start: typeof t.start === "string" ? t.start : "",
-              end: typeof t.end === "string" ? t.end : ""
+              end: typeof t.end === "string" ? t.end : "",
+              note: ""
             }
           ];
         }
         if (sessions.length === 0) {
-          sessions = [{ start: "", end: "" }];
+          sessions = [{ start: "", end: "", note: "" }];
         }
         let done;
         if (t.done === "Y")
@@ -3372,6 +3374,7 @@ function renderTable(container, tasks, onChange) {
   function buildTaskRows(task, taskIdx) {
     const sessionCount = task.sessions.length;
     task.sessions.forEach((session, sessIdx) => {
+      const isLast = sessIdx === sessionCount - 1;
       const row = tbody.createEl("tr", {
         attr: { "data-task": String(taskIdx), "data-session": String(sessIdx) }
       });
@@ -3424,15 +3427,52 @@ function renderTable(container, tasks, onChange) {
         });
       });
       const dur = computeDuration(session.start, session.end);
-      if (sessIdx === sessionCount - 1 && sessionCount > 1) {
+      const durCell = row.createEl("td", { cls: "duration-cell" });
+      if (dur) {
+        durCell.createEl("span", { cls: "dur-text", text: dur });
+      } else if (isLast && sessionCount > 1) {
         const taskMin = computeTaskMinutes(task);
-        row.createEl("td", {
-          cls: "duration-cell",
-          text: dur ? `${dur} (\u8BA1 ${formatDuration(taskMin)})` : taskMin > 0 ? `\u8BA1 ${formatDuration(taskMin)}` : "\u2014"
-        });
+        if (taskMin > 0) {
+          durCell.createEl("span", { cls: "dur-text", text: `\u8BA1 ${formatDuration(taskMin)}` });
+        } else {
+          durCell.createEl("span", { cls: "dur-text", text: "\u2014" });
+        }
       } else {
-        row.createEl("td", { cls: "duration-cell", text: dur || "\u2014" });
+        durCell.createEl("span", { cls: "dur-text", text: "\u2014" });
       }
+      if (isLast && sessionCount > 1) {
+        const taskMin = computeTaskMinutes(task);
+        if (taskMin > 0 && dur) {
+          durCell.createEl("span", {
+            cls: "dur-sub",
+            text: `\u8BA1 ${formatDuration(taskMin)}`
+          });
+        }
+      }
+      const noteSpan = durCell.createEl("span", {
+        cls: "session-note",
+        text: session.note || "",
+        attr: { "data-placeholder": "\u5907\u6CE8\u2026" }
+      });
+      noteSpan.setAttr("contenteditable", "true");
+      noteSpan.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            noteSpan.blur();
+          }
+        },
+        true
+      );
+      noteSpan.addEventListener("blur", () => {
+        const newNote = noteSpan.getText().trim();
+        if (newNote !== session.note) {
+          session.note = newNote;
+          onChange(tasks);
+        }
+      });
       if (sessIdx === 0) {
         const doneCell = row.createEl("td", {
           cls: "done-cell",
@@ -3456,8 +3496,8 @@ function renderTable(container, tasks, onChange) {
           });
         }
       }
-      const delCell = row.createEl("td", { cls: "action-cell" });
-      const delBtn = delCell.createEl("button", {
+      const actCell = row.createEl("td", { cls: "action-cell" });
+      const delBtn = actCell.createEl("button", {
         cls: "delete-session-btn",
         text: "\xD7",
         attr: { title: "\u5220\u9664\u6B64\u65F6\u6BB5" }
@@ -3471,19 +3511,18 @@ function renderTable(container, tasks, onChange) {
         }
         onChange(tasks);
       });
-    });
-    const addSessRow = tbody.createEl("tr", { cls: "add-session-row" });
-    const addSessCell = addSessRow.createEl("td", {
-      attr: { colspan: "6" }
-    });
-    const addSessBtn = addSessCell.createEl("button", {
-      cls: "add-session-btn",
-      text: `+ \u4E3A\u300C${task.name || "\u672A\u547D\u540D"}\u300D\u6DFB\u52A0\u65F6\u6BB5`
-    });
-    addSessBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      task.sessions.push({ start: "", end: "" });
-      onChange(tasks);
+      if (isLast) {
+        const addBtn2 = actCell.createEl("button", {
+          cls: "add-session-btn",
+          text: "+",
+          attr: { title: "\u6DFB\u52A0\u65F6\u6BB5" }
+        });
+        addBtn2.addEventListener("click", (e) => {
+          e.stopPropagation();
+          task.sessions.push({ start: "", end: "", note: "" });
+          onChange(tasks);
+        });
+      }
     });
   }
   tasks.forEach((task, idx) => buildTaskRows(task, idx));
@@ -3510,7 +3549,7 @@ function renderTable(container, tasks, onChange) {
     e.stopPropagation();
     tasks.push({
       name: "",
-      sessions: [{ start: "", end: "" }],
+      sessions: [{ start: "", end: "", note: "" }],
       done: ""
     });
     onChange(tasks);
@@ -3657,6 +3696,7 @@ tasks:
     sessions:
       - start: ""
         end: ""
+        note: ""
     done: ""
 \`\`\`
 `;

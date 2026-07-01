@@ -42,6 +42,7 @@ export function renderTable(
     const sessionCount = task.sessions.length;
 
     task.sessions.forEach((session, sessIdx) => {
+      const isLast = sessIdx === sessionCount - 1;
       const row = tbody.createEl("tr", {
         attr: { "data-task": String(taskIdx), "data-session": String(sessIdx) },
       });
@@ -102,22 +103,59 @@ export function renderTable(
         });
       });
 
-      // ── 4. Duration (computed, read-only) ──
+      // ── 4. Duration + note ──
       const dur = computeDuration(session.start, session.end);
-      if (sessIdx === sessionCount - 1 && sessionCount > 1) {
-        // Last session row of a multi-session task: show per-task total
+      const durCell = row.createEl("td", { cls: "duration-cell" });
+
+      if (dur) {
+        durCell.createEl("span", { cls: "dur-text", text: dur });
+      } else if (isLast && sessionCount > 1) {
         const taskMin = computeTaskMinutes(task);
-        row.createEl("td", {
-          cls: "duration-cell",
-          text: dur
-            ? `${dur} (计 ${formatDuration(taskMin)})`
-            : taskMin > 0
-            ? `计 ${formatDuration(taskMin)}`
-            : "—",
-        });
+        if (taskMin > 0) {
+          durCell.createEl("span", { cls: "dur-text", text: `计 ${formatDuration(taskMin)}` });
+        } else {
+          durCell.createEl("span", { cls: "dur-text", text: "—" });
+        }
       } else {
-        row.createEl("td", { cls: "duration-cell", text: dur || "—" });
+        durCell.createEl("span", { cls: "dur-text", text: "—" });
       }
+
+      // Multi-session: show task total on last row
+      if (isLast && sessionCount > 1) {
+        const taskMin = computeTaskMinutes(task);
+        if (taskMin > 0 && dur) {
+          durCell.createEl("span", {
+            cls: "dur-sub",
+            text: `计 ${formatDuration(taskMin)}`,
+          });
+        }
+      }
+
+      // Note — click to edit
+      const noteSpan = durCell.createEl("span", {
+        cls: "session-note",
+        text: session.note || "",
+        attr: { "data-placeholder": "备注…" },
+      });
+      noteSpan.setAttr("contenteditable", "true");
+      noteSpan.addEventListener(
+        "keydown",
+        (e: KeyboardEvent) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            noteSpan.blur();
+          }
+        },
+        true
+      );
+      noteSpan.addEventListener("blur", () => {
+        const newNote = noteSpan.getText().trim();
+        if (newNote !== session.note) {
+          session.note = newNote;
+          onChange(tasks);
+        }
+      });
 
       // ── 5. Done badge (rowspan across sessions) ──
       if (sessIdx === 0) {
@@ -145,9 +183,11 @@ export function renderTable(
         }
       }
 
-      // ── 6. Delete session button ──
-      const delCell = row.createEl("td", { cls: "action-cell" });
-      const delBtn = delCell.createEl("button", {
+      // ── 6. Action buttons (× delete, + add on last row) ──
+      const actCell = row.createEl("td", { cls: "action-cell" });
+
+      // Delete session button
+      const delBtn = actCell.createEl("button", {
         cls: "delete-session-btn",
         text: "×",
         attr: { title: "删除此时段" },
@@ -155,28 +195,26 @@ export function renderTable(
       delBtn.addEventListener("click", (e: MouseEvent) => {
         e.stopPropagation();
         if (task.sessions.length <= 1) {
-          // Remove the entire task if it's the last session
           tasks.splice(taskIdx, 1);
         } else {
           task.sessions.splice(sessIdx, 1);
         }
         onChange(tasks);
       });
-    });
 
-    // ── Add-session row for this task ──
-    const addSessRow = tbody.createEl("tr", { cls: "add-session-row" });
-    const addSessCell = addSessRow.createEl("td", {
-      attr: { colspan: "6" },
-    });
-    const addSessBtn = addSessCell.createEl("button", {
-      cls: "add-session-btn",
-      text: `+ 为「${task.name || "未命名"}」添加时段`,
-    });
-    addSessBtn.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation();
-      task.sessions.push({ start: "", end: "" });
-      onChange(tasks);
+      // Add-session button (only on last row)
+      if (isLast) {
+        const addBtn = actCell.createEl("button", {
+          cls: "add-session-btn",
+          text: "+",
+          attr: { title: "添加时段" },
+        });
+        addBtn.addEventListener("click", (e: MouseEvent) => {
+          e.stopPropagation();
+          task.sessions.push({ start: "", end: "", note: "" });
+          onChange(tasks);
+        });
+      }
     });
   }
 
@@ -211,7 +249,7 @@ export function renderTable(
     e.stopPropagation();
     tasks.push({
       name: "",
-      sessions: [{ start: "", end: "" }],
+      sessions: [{ start: "", end: "", note: "" }],
       done: "",
     });
     onChange(tasks);

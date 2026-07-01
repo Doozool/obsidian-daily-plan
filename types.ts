@@ -1,6 +1,7 @@
 export interface Session {
   start: string;
   end: string;
+  note: string;
 }
 
 export interface Task {
