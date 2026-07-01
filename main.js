@@ -3628,7 +3628,9 @@ function createDailyPlanProcessor(app) {
       const newYaml = serializeDailyPlanYaml(tasks);
       updateCodeBlock(editor, newYaml);
       requestAnimationFrame(() => {
-        window.scrollTo(0, scrollY);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
       });
     });
     const child = new import_obsidian2.MarkdownRenderChild(table);

@@ -45,9 +45,11 @@ export function createDailyPlanProcessor(
       const newYaml = serializeDailyPlanYaml(tasks);
       updateCodeBlock(editor, newYaml);
 
-      // Restore scroll after DOM rebuild
+      // Double rAF waits for full layout + paint cycle before restoring scroll
       requestAnimationFrame(() => {
-        window.scrollTo(0, scrollY);
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollY);
+        });
       });
     });
 

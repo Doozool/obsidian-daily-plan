@@ -17,12 +17,11 @@
   text-transform: uppercase;
 }
 
-.daily-plan-table th:nth-child(1) { width: auto; }
-.daily-plan-table th:nth-child(2) { width: 70px; }
-.daily-plan-table th:nth-child(3) { width: 70px; }
-.daily-plan-table th:nth-child(4) { width: 75px; }
-.daily-plan-table th:nth-child(5) { width: 45px; }
-.daily-plan-table th:nth-child(6) { width: 40px; }
+.daily-plan-table th:nth-child(2) { width: 65px; }
+.daily-plan-table th:nth-child(3) { width: 65px; }
+.daily-plan-table th:nth-child(4) { width: 72px; }
+.daily-plan-table th:nth-child(5) { width: 42px; }
+.daily-plan-table th:nth-child(6) { width: 42px; }
 
 .daily-plan-table td {
   padding: 4px 8px;
