@@ -107,21 +107,43 @@
   min-width: 30px;
 }
 
-.delete-row-btn {
+.delete-session-btn {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
-  color: var(--text-muted);
-  padding: 0 4px;
+  font-size: 14px;
+  color: var(--text-faint);
+  padding: 0 3px;
   border-radius: 3px;
   line-height: 1;
   transition: all 0.15s;
 }
 
-.delete-row-btn:hover {
+.delete-session-btn:hover {
   color: var(--text-error, #e74c3c);
   background: var(--background-modifier-hover);
+}
+
+/* ── Add session button ── */
+.add-session-row td {
+  padding: 2px 8px;
+  border-bottom: 1px dashed var(--table-border-color, #e0e0e0);
+}
+
+.add-session-btn {
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px;
+  font-size: 11px;
+  color: var(--text-faint);
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.add-session-btn:hover {
+  color: var(--interactive-accent);
 }
 
 /* ── Add row button ── */

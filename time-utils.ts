@@ -1,3 +1,5 @@
+import type { Session, Task } from "./types";
+
 /**
  * Returns the current time formatted as HH:mm (24-hour).
  */
@@ -43,26 +45,55 @@ export function computeDuration(start: string, end: string): string | null {
 }
 
 /**
- * Sum durations across all tasks that have valid start/end times.
- * Returns a human-readable total, or null if no valid durations exist.
+ * Sum durations across all sessions of a task.
+ * Returns total minutes, or 0 if no valid durations.
  */
-export function computeTotalDuration(tasks: Array<{ start: string; end: string }>): string | null {
-  let totalMinutes = 0;
-
-  for (const t of tasks) {
-    if (!t.start || !t.end) continue;
-    const startMin = parseMinutes(t.start);
-    const endMin = parseMinutes(t.end);
+export function computeTaskMinutes(task: Task): number {
+  let total = 0;
+  for (const s of task.sessions) {
+    if (!s.start || !s.end) continue;
+    const startMin = parseMinutes(s.start);
+    const endMin = parseMinutes(s.end);
     if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin) continue;
-    totalMinutes += endMin - startMin;
+    total += endMin - startMin;
   }
+  return total;
+}
 
-  if (totalMinutes <= 0) return null;
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+/**
+ * Format total minutes as a human-readable string.
+ * Returns null if minutes is 0.
+ */
+export function formatDuration(minutes: number): string | null {
+  if (minutes <= 0) return null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
   if (hours > 0) return `${hours}h`;
-  return `${minutes}m`;
+  return `${mins}m`;
+}
+
+/**
+ * Sum durations across ALL tasks. Returns human-readable total or null.
+ */
+export function computeTotalDuration(tasks: Task[]): string | null {
+  let totalMinutes = 0;
+  for (const t of tasks) {
+    totalMinutes += computeTaskMinutes(t);
+  }
+  return formatDuration(totalMinutes);
+}
+
+/**
+ * Check if a task has any valid duration (for done-state toggle logic).
+ */
+export function hasAnyDuration(task: Task): boolean {
+  return computeTaskMinutes(task) > 0;
+}
+
+/**
+ * Check if any session has a valid duration (for done-state per-task).
+ */
+export function hasSessionDuration(session: Session): boolean {
+  return computeDuration(session.start, session.end) !== null;
 }

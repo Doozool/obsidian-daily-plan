@@ -3209,12 +3209,33 @@ function parseDailyPlanYaml(source) {
   try {
     const data = load(source);
     if (data && Array.isArray(data.tasks)) {
-      return data.tasks.map((t) => ({
-        name: typeof t.name === "string" ? t.name : "",
-        start: typeof t.start === "string" ? t.start : "",
-        end: typeof t.end === "string" ? t.end : "",
-        done: t.done === "Y" ? "Y" : t.done === "N" ? "N" : ""
-      }));
+      return data.tasks.map((t) => {
+        let sessions = [];
+        if (Array.isArray(t.sessions)) {
+          sessions = t.sessions.map((s) => ({
+            start: typeof s.start === "string" ? s.start : "",
+            end: typeof s.end === "string" ? s.end : ""
+          }));
+        } else if (typeof t.start === "string" || typeof t.end === "string") {
+          sessions = [
+            {
+              start: typeof t.start === "string" ? t.start : "",
+              end: typeof t.end === "string" ? t.end : ""
+            }
+          ];
+        }
+        if (sessions.length === 0) {
+          sessions = [{ start: "", end: "" }];
+        }
+        let done;
+        if (t.done === "Y")
+          done = "Y";
+        else if (t.done === "N")
+          done = "N";
+        else
+          done = "";
+        return { name: typeof t.name === "string" ? t.name : "", sessions, done };
+      });
     }
     return [];
   } catch {
@@ -3247,9 +3268,7 @@ function findCodeBlockRange(editor) {
     return null;
   return {
     start: editor.offsetToPos(contentStart + 1),
-    // first char after newline
     end: editor.offsetToPos(endIdx + 1)
-    // first char of closing ``` line
   };
 }
 function updateCodeBlock(editor, newYaml) {
@@ -3299,26 +3318,39 @@ function computeDuration(start, end) {
     return `${hours}h`;
   return `${minutes}m`;
 }
+function computeTaskMinutes(task) {
+  let total = 0;
+  for (const s of task.sessions) {
+    if (!s.start || !s.end)
+      continue;
+    const startMin = parseMinutes(s.start);
+    const endMin = parseMinutes(s.end);
+    if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin)
+      continue;
+    total += endMin - startMin;
+  }
+  return total;
+}
+function formatDuration(minutes) {
+  if (minutes <= 0)
+    return null;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0 && mins > 0)
+    return `${hours}h ${mins}m`;
+  if (hours > 0)
+    return `${hours}h`;
+  return `${mins}m`;
+}
 function computeTotalDuration(tasks) {
   let totalMinutes = 0;
   for (const t of tasks) {
-    if (!t.start || !t.end)
-      continue;
-    const startMin = parseMinutes(t.start);
-    const endMin = parseMinutes(t.end);
-    if (isNaN(startMin) || isNaN(endMin) || endMin <= startMin)
-      continue;
-    totalMinutes += endMin - startMin;
+    totalMinutes += computeTaskMinutes(t);
   }
-  if (totalMinutes <= 0)
-    return null;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours > 0 && minutes > 0)
-    return `${hours}h ${minutes}m`;
-  if (hours > 0)
-    return `${hours}h`;
-  return `${minutes}m`;
+  return formatDuration(totalMinutes);
+}
+function hasAnyDuration(task) {
+  return computeTaskMinutes(task) > 0;
 }
 
 // table-renderer.ts
@@ -3333,96 +3365,139 @@ function renderTable(container, tasks, onChange) {
   });
   const thead = table.createEl("thead");
   const headerRow = thead.createEl("tr");
-  for (const label of ["\u4EFB\u52A1", "\u5F00\u59CB\u65F6\u95F4", "\u7ED3\u675F\u65F6\u95F4", "\u603B\u7528\u65F6", "\u5B8C\u6210", ""]) {
+  for (const label of ["\u4EFB\u52A1", "\u5F00\u59CB", "\u7ED3\u675F", "\u7528\u65F6", "\u5B8C\u6210", ""]) {
     headerRow.createEl("th", { text: label });
   }
   const tbody = table.createEl("tbody");
-  function buildRow(task, index) {
-    const row = tbody.createEl("tr", {
-      attr: { "data-index": String(index) }
-    });
-    const nameCell = row.createEl("td", { cls: "name-cell" });
-    nameCell.setAttr("contenteditable", "true");
-    nameCell.setText(task.name);
-    nameCell.addEventListener(
-      "keydown",
-      (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          nameCell.blur();
-        }
-      },
-      true
-      // capture phase
-    );
-    nameCell.addEventListener("blur", () => {
-      const newName = nameCell.getText().trim();
-      if (newName !== task.name) {
-        task.name = newName;
-        onChange(tasks);
+  function buildTaskRows(task, taskIdx) {
+    const sessionCount = task.sessions.length;
+    task.sessions.forEach((session, sessIdx) => {
+      const row = tbody.createEl("tr", {
+        attr: { "data-task": String(taskIdx), "data-session": String(sessIdx) }
+      });
+      if (sessIdx === 0) {
+        const nameCell = row.createEl("td", {
+          cls: "name-cell",
+          attr: { rowspan: String(sessionCount) }
+        });
+        nameCell.setAttr("contenteditable", "true");
+        nameCell.setText(task.name);
+        nameCell.addEventListener(
+          "keydown",
+          (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              nameCell.blur();
+            }
+          },
+          true
+        );
+        nameCell.addEventListener("blur", () => {
+          const newName = nameCell.getText().trim();
+          if (newName !== task.name) {
+            task.name = newName;
+            onChange(tasks);
+          }
+        });
       }
-    });
-    const startCell = row.createEl("td", {
-      cls: "time-cell",
-      text: task.start || "\u2014"
-    });
-    startCell.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showTimePickerPopup(startCell, task.start, (val) => {
-        task.start = val;
-        onChange(tasks);
+      const startCell = row.createEl("td", {
+        cls: "time-cell",
+        text: session.start || "\u2014"
       });
-    });
-    const endCell = row.createEl("td", {
-      cls: "time-cell",
-      text: task.end || "\u2014"
-    });
-    endCell.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showTimePickerPopup(endCell, task.end, (val) => {
-        task.end = val;
-        onChange(tasks);
-      });
-    });
-    const dur = computeDuration(task.start, task.end);
-    row.createEl("td", { cls: "duration-cell", text: dur || "\u2014" });
-    const doneCell = row.createEl("td", { cls: "done-cell" });
-    const hasDuration = dur !== null;
-    if (!hasDuration) {
-      const badge = doneCell.createEl("span", {
-        cls: "done-badge is-idle"
-      });
-    } else {
-      const isDone = task.done === "Y";
-      const badge = doneCell.createEl("span", {
-        cls: `done-badge ${isDone ? "is-done" : "is-undone"}`,
-        text: isDone ? "\u2713" : "\u2715"
-      });
-      badge.addEventListener("click", (e) => {
+      startCell.addEventListener("click", (e) => {
         e.stopPropagation();
-        task.done = task.done === "Y" ? "N" : "Y";
+        showTimePickerPopup(startCell, session.start, (val) => {
+          session.start = val;
+          onChange(tasks);
+        });
+      });
+      const endCell = row.createEl("td", {
+        cls: "time-cell",
+        text: session.end || "\u2014"
+      });
+      endCell.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showTimePickerPopup(endCell, session.end, (val) => {
+          session.end = val;
+          onChange(tasks);
+        });
+      });
+      const dur = computeDuration(session.start, session.end);
+      if (sessIdx === sessionCount - 1 && sessionCount > 1) {
+        const taskMin = computeTaskMinutes(task);
+        row.createEl("td", {
+          cls: "duration-cell",
+          text: dur ? `${dur} (\u8BA1 ${formatDuration(taskMin)})` : taskMin > 0 ? `\u8BA1 ${formatDuration(taskMin)}` : "\u2014"
+        });
+      } else {
+        row.createEl("td", { cls: "duration-cell", text: dur || "\u2014" });
+      }
+      if (sessIdx === 0) {
+        const doneCell = row.createEl("td", {
+          cls: "done-cell",
+          attr: { rowspan: String(sessionCount) }
+        });
+        const hasDuration = hasAnyDuration(task);
+        if (!hasDuration) {
+          const badge = doneCell.createEl("span", {
+            cls: "done-badge is-idle"
+          });
+        } else {
+          const isDone = task.done === "Y";
+          const badge = doneCell.createEl("span", {
+            cls: `done-badge ${isDone ? "is-done" : "is-undone"}`,
+            text: isDone ? "\u2713" : "\u2715"
+          });
+          badge.addEventListener("click", (e) => {
+            e.stopPropagation();
+            task.done = task.done === "Y" ? "N" : "Y";
+            onChange(tasks);
+          });
+        }
+      }
+      const delCell = row.createEl("td", { cls: "action-cell" });
+      const delBtn = delCell.createEl("button", {
+        cls: "delete-session-btn",
+        text: "\xD7",
+        attr: { title: "\u5220\u9664\u6B64\u65F6\u6BB5" }
+      });
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (task.sessions.length <= 1) {
+          tasks.splice(taskIdx, 1);
+        } else {
+          task.sessions.splice(sessIdx, 1);
+        }
         onChange(tasks);
       });
-    }
-    const delCell = row.createEl("td", { cls: "action-cell" });
-    const delBtn = delCell.createEl("button", {
-      cls: "delete-row-btn",
-      text: "\xD7",
-      attr: { title: "\u5220\u9664\u6B64\u4EFB\u52A1" }
     });
-    delBtn.addEventListener("click", (e) => {
+    const addSessRow = tbody.createEl("tr", { cls: "add-session-row" });
+    const addSessCell = addSessRow.createEl("td", {
+      attr: { colspan: "6" }
+    });
+    const addSessBtn = addSessCell.createEl("button", {
+      cls: "add-session-btn",
+      text: `+ \u4E3A\u300C${task.name || "\u672A\u547D\u540D"}\u300D\u6DFB\u52A0\u65F6\u6BB5`
+    });
+    addSessBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      tasks.splice(index, 1);
+      task.sessions.push({ start: "", end: "" });
       onChange(tasks);
     });
-    return row;
   }
-  tasks.forEach((task, idx) => buildRow(task, idx));
+  tasks.forEach((task, idx) => buildTaskRows(task, idx));
   const tfoot = table.createEl("tfoot");
   const totalRow = tfoot.createEl("tr", { cls: "total-row" });
-  totalRow.createEl("td", { attr: { colspan: "3" }, cls: "total-label", text: "\u603B\u8BA1" });
-  totalRow.createEl("td", { cls: "total-duration", text: computeTotalDuration(tasks) || "\u2014" });
+  totalRow.createEl("td", {
+    attr: { colspan: "3" },
+    cls: "total-label",
+    text: "\u603B\u8BA1"
+  });
+  totalRow.createEl("td", {
+    cls: "total-duration",
+    text: computeTotalDuration(tasks) || "\u2014"
+  });
   totalRow.createEl("td");
   totalRow.createEl("td");
   const addRow = tfoot.createEl("tr");
@@ -3433,7 +3508,11 @@ function renderTable(container, tasks, onChange) {
   });
   addBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    tasks.push({ name: "", start: "", end: "", done: "" });
+    tasks.push({
+      name: "",
+      sessions: [{ start: "", end: "" }],
+      done: ""
+    });
     onChange(tasks);
   });
   return table;
@@ -3575,17 +3654,16 @@ var DailyPlanPlugin = class extends import_obsidian3.Plugin {
 \`\`\`daily-plan
 tasks:
   - name: ""
-    start: ""
-    end: ""
+    sessions:
+      - start: ""
+        end: ""
     done: ""
 \`\`\`
 `;
     const cursor = editor.getCursor();
     editor.replaceRange(template, cursor);
-    const namePos = editor.offsetToPos(
-      editor.posToOffset(cursor) + heading.length + 2 + "```daily-plan\ntasks:\n  - name: ".length
-    );
-    editor.setCursor(namePos);
+    const endPos = editor.offsetToPos(editor.posToOffset(cursor) + template.length);
+    editor.setCursor(endPos);
   }
   /**
    * Format Date as YYYY-MM-DD.

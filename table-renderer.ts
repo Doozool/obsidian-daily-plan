@@ -1,5 +1,12 @@
-import type { Task } from "./types";
-import { computeDuration, computeTotalDuration, getCurrentTime } from "./time-utils";
+import type { Task, Session } from "./types";
+import {
+  computeDuration,
+  computeTaskMinutes,
+  computeTotalDuration,
+  formatDuration,
+  getCurrentTime,
+  hasAnyDuration,
+} from "./time-utils";
 
 /**
  * Build an interactive daily-plan table inside `container`.
@@ -10,12 +17,10 @@ export function renderTable(
   tasks: Task[],
   onChange: (tasks: Task[]) => void
 ): HTMLElement {
-  // Clear any previous content
   container.empty();
 
   const table = container.createEl("table", { cls: "daily-plan-table" });
 
-  // Prevent Obsidian from intercepting clicks/keys inside our table
   table.addEventListener("mousedown", (e: MouseEvent) => {
     e.stopPropagation();
   });
@@ -26,128 +31,176 @@ export function renderTable(
   // --- Header ---
   const thead = table.createEl("thead");
   const headerRow = thead.createEl("tr");
-  for (const label of ["任务", "开始时间", "结束时间", "总用时", "完成", ""]) {
+  for (const label of ["任务", "开始", "结束", "用时", "完成", ""]) {
     headerRow.createEl("th", { text: label });
   }
 
   // --- Body ---
   const tbody = table.createEl("tbody");
 
-  function buildRow(task: Task, index: number): HTMLTableRowElement {
-    const row = tbody.createEl("tr", {
-      attr: { "data-index": String(index) },
-    });
+  function buildTaskRows(task: Task, taskIdx: number): void {
+    const sessionCount = task.sessions.length;
 
-    // 1. Task name — contenteditable, Enter=blur, no newlines
-    const nameCell = row.createEl("td", { cls: "name-cell" });
-    nameCell.setAttr("contenteditable", "true");
-    nameCell.setText(task.name);
+    task.sessions.forEach((session, sessIdx) => {
+      const row = tbody.createEl("tr", {
+        attr: { "data-task": String(taskIdx), "data-session": String(sessIdx) },
+      });
 
-    // Capture phase to beat Obsidian's own key handlers
-    nameCell.addEventListener(
-      "keydown",
-      (e: KeyboardEvent) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          nameCell.blur();
-        }
-      },
-      true // capture phase
-    );
+      // ── 1. Name cell (rowspan across sessions) ──
+      if (sessIdx === 0) {
+        const nameCell = row.createEl("td", {
+          cls: "name-cell",
+          attr: { rowspan: String(sessionCount) },
+        });
+        nameCell.setAttr("contenteditable", "true");
+        nameCell.setText(task.name);
 
-    nameCell.addEventListener("blur", () => {
-      const newName = nameCell.getText().trim();
-      if (newName !== task.name) {
-        task.name = newName;
-        onChange(tasks);
+        nameCell.addEventListener(
+          "keydown",
+          (e: KeyboardEvent) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              e.stopPropagation();
+              nameCell.blur();
+            }
+          },
+          true
+        );
+
+        nameCell.addEventListener("blur", () => {
+          const newName = nameCell.getText().trim();
+          if (newName !== task.name) {
+            task.name = newName;
+            onChange(tasks);
+          }
+        });
       }
-    });
 
-    // 2. Start time — click opens popup
-    const startCell = row.createEl("td", {
-      cls: "time-cell",
-      text: task.start || "—",
-    });
-    startCell.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation();
-      showTimePickerPopup(startCell, task.start, (val) => {
-        task.start = val;
-        onChange(tasks);
+      // ── 2. Start time ──
+      const startCell = row.createEl("td", {
+        cls: "time-cell",
+        text: session.start || "—",
       });
-    });
-
-    // 3. End time — click opens popup
-    const endCell = row.createEl("td", {
-      cls: "time-cell",
-      text: task.end || "—",
-    });
-    endCell.addEventListener("click", (e: MouseEvent) => {
-      e.stopPropagation();
-      showTimePickerPopup(endCell, task.end, (val) => {
-        task.end = val;
-        onChange(tasks);
-      });
-    });
-
-    // 4. Duration (computed, read-only)
-    const dur = computeDuration(task.start, task.end);
-    row.createEl("td", { cls: "duration-cell", text: dur || "—" });
-
-    // 5. Done toggle — logic depends on whether duration exists
-    const doneCell = row.createEl("td", { cls: "done-cell" });
-    const hasDuration = dur !== null;
-
-    if (!hasDuration) {
-      // No times filled → dashed empty circle, non-interactive
-      const badge = doneCell.createEl("span", {
-        cls: "done-badge is-idle",
-      });
-    } else {
-      // Has duration → toggle between ✓ and ✕
-      const isDone = task.done === "Y";
-      const badge = doneCell.createEl("span", {
-        cls: `done-badge ${isDone ? "is-done" : "is-undone"}`,
-        text: isDone ? "✓" : "✕",
-      });
-      badge.addEventListener("click", (e: MouseEvent) => {
+      startCell.addEventListener("click", (e: MouseEvent) => {
         e.stopPropagation();
-        task.done = task.done === "Y" ? "N" : "Y";
+        showTimePickerPopup(startCell, session.start, (val) => {
+          session.start = val;
+          onChange(tasks);
+        });
+      });
+
+      // ── 3. End time ──
+      const endCell = row.createEl("td", {
+        cls: "time-cell",
+        text: session.end || "—",
+      });
+      endCell.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        showTimePickerPopup(endCell, session.end, (val) => {
+          session.end = val;
+          onChange(tasks);
+        });
+      });
+
+      // ── 4. Duration (computed, read-only) ──
+      const dur = computeDuration(session.start, session.end);
+      if (sessIdx === sessionCount - 1 && sessionCount > 1) {
+        // Last session row of a multi-session task: show per-task total
+        const taskMin = computeTaskMinutes(task);
+        row.createEl("td", {
+          cls: "duration-cell",
+          text: dur
+            ? `${dur} (计 ${formatDuration(taskMin)})`
+            : taskMin > 0
+            ? `计 ${formatDuration(taskMin)}`
+            : "—",
+        });
+      } else {
+        row.createEl("td", { cls: "duration-cell", text: dur || "—" });
+      }
+
+      // ── 5. Done badge (rowspan across sessions) ──
+      if (sessIdx === 0) {
+        const doneCell = row.createEl("td", {
+          cls: "done-cell",
+          attr: { rowspan: String(sessionCount) },
+        });
+        const hasDuration = hasAnyDuration(task);
+
+        if (!hasDuration) {
+          const badge = doneCell.createEl("span", {
+            cls: "done-badge is-idle",
+          });
+        } else {
+          const isDone = task.done === "Y";
+          const badge = doneCell.createEl("span", {
+            cls: `done-badge ${isDone ? "is-done" : "is-undone"}`,
+            text: isDone ? "✓" : "✕",
+          });
+          badge.addEventListener("click", (e: MouseEvent) => {
+            e.stopPropagation();
+            task.done = task.done === "Y" ? "N" : "Y";
+            onChange(tasks);
+          });
+        }
+      }
+
+      // ── 6. Delete session button ──
+      const delCell = row.createEl("td", { cls: "action-cell" });
+      const delBtn = delCell.createEl("button", {
+        cls: "delete-session-btn",
+        text: "×",
+        attr: { title: "删除此时段" },
+      });
+      delBtn.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        if (task.sessions.length <= 1) {
+          // Remove the entire task if it's the last session
+          tasks.splice(taskIdx, 1);
+        } else {
+          task.sessions.splice(sessIdx, 1);
+        }
         onChange(tasks);
       });
-    }
-
-    // 6. Delete button
-    const delCell = row.createEl("td", { cls: "action-cell" });
-    const delBtn = delCell.createEl("button", {
-      cls: "delete-row-btn",
-      text: "×",
-      attr: { title: "删除此任务" },
     });
-    delBtn.addEventListener("click", (e: MouseEvent) => {
+
+    // ── Add-session row for this task ──
+    const addSessRow = tbody.createEl("tr", { cls: "add-session-row" });
+    const addSessCell = addSessRow.createEl("td", {
+      attr: { colspan: "6" },
+    });
+    const addSessBtn = addSessCell.createEl("button", {
+      cls: "add-session-btn",
+      text: `+ 为「${task.name || "未命名"}」添加时段`,
+    });
+    addSessBtn.addEventListener("click", (e: MouseEvent) => {
       e.stopPropagation();
-      tasks.splice(index, 1);
+      task.sessions.push({ start: "", end: "" });
       onChange(tasks);
     });
-
-    return row;
   }
 
-  // Build initial rows
-  tasks.forEach((task, idx) => buildRow(task, idx));
+  // Build all task rows
+  tasks.forEach((task, idx) => buildTaskRows(task, idx));
 
-  // --- Footer: total duration + add-row button ---
+  // --- Footer: total + add task ---
   const tfoot = table.createEl("tfoot");
 
   // Total row
   const totalRow = tfoot.createEl("tr", { cls: "total-row" });
-  totalRow.createEl("td", { attr: { colspan: "3" }, cls: "total-label", text: "总计" });
-  totalRow.createEl("td", { cls: "total-duration", text: computeTotalDuration(tasks) || "—" });
-  // Empty cells for done + action columns
+  totalRow.createEl("td", {
+    attr: { colspan: "3" },
+    cls: "total-label",
+    text: "总计",
+  });
+  totalRow.createEl("td", {
+    cls: "total-duration",
+    text: computeTotalDuration(tasks) || "—",
+  });
   totalRow.createEl("td");
   totalRow.createEl("td");
 
-  // Add-row button row
+  // Add-task row
   const addRow = tfoot.createEl("tr");
   const addCell = addRow.createEl("td", { attr: { colspan: "6" } });
   const addBtn = addCell.createEl("button", {
@@ -156,7 +209,11 @@ export function renderTable(
   });
   addBtn.addEventListener("click", (e: MouseEvent) => {
     e.stopPropagation();
-    tasks.push({ name: "", start: "", end: "", done: "" });
+    tasks.push({
+      name: "",
+      sessions: [{ start: "", end: "" }],
+      done: "",
+    });
     onChange(tasks);
   });
 
@@ -164,7 +221,7 @@ export function renderTable(
 }
 
 // ---------------------------------------------------------------------------
-// Time-picker popup (attached to document.body to avoid clipping)
+// Time-picker popup
 // ---------------------------------------------------------------------------
 
 function showTimePickerPopup(
@@ -176,14 +233,12 @@ function showTimePickerPopup(
 
   const popup = document.body.createEl("div", { cls: "time-picker-popup" });
 
-  // Position the popup near the cell
   const rect = cell.getBoundingClientRect();
   popup.style.position = "fixed";
   popup.style.top = rect.bottom + 4 + "px";
   popup.style.left = rect.left + "px";
   popup.style.zIndex = "1000";
 
-  // "Fill current time" button
   const nowBtn = popup.createEl("button", {
     cls: "time-picker-now-btn",
     text: "填入当前时间",
@@ -194,10 +249,8 @@ function showTimePickerPopup(
     popup.remove();
   });
 
-  // Separator
   popup.createEl("div", { cls: "time-picker-separator", text: "或手动输入" });
 
-  // Manual input row
   const inputRow = popup.createEl("div", { cls: "time-picker-input-row" });
   const input = inputRow.createEl("input", {
     type: "text",
@@ -234,10 +287,8 @@ function showTimePickerPopup(
     }
   }
 
-  // Focus the input
   setTimeout(() => input.focus(), 0);
 
-  // Close on outside click
   setTimeout(() => {
     document.addEventListener("click", closeOpenPicker, { once: true });
   }, 0);

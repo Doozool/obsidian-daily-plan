@@ -69,16 +69,14 @@ export default class DailyPlanPlugin extends Plugin {
     const dayName = DAY_NAMES[today.getDay()];
     const heading = `### ${dateStr} ${dayName}`;
 
-    const template = `${heading}\n\n\`\`\`daily-plan\ntasks:\n  - name: ""\n    start: ""\n    end: ""\n    done: ""\n\`\`\`\n`;
+    const template = `${heading}\n\n\`\`\`daily-plan\ntasks:\n  - name: ""\n    sessions:\n      - start: ""\n        end: ""\n    done: ""\n\`\`\`\n`;
 
     const cursor = editor.getCursor();
     editor.replaceRange(template, cursor);
 
-    // Place cursor inside the first task name for immediate editing
-    const namePos = editor.offsetToPos(
-      editor.posToOffset(cursor) + heading.length + 2 + "```daily-plan\ntasks:\n  - name: ".length
-    );
-    editor.setCursor(namePos);
+    // Place cursor after the code block so it renders as a table immediately
+    const endPos = editor.offsetToPos(editor.posToOffset(cursor) + template.length);
+    editor.setCursor(endPos);
   }
 
   /**

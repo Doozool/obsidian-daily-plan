@@ -1,7 +1,11 @@
-export interface Task {
-  name: string;
+export interface Session {
   start: string;
   end: string;
+}
+
+export interface Task {
+  name: string;
+  sessions: Session[];
   done: "Y" | "N" | "";
 }
 
