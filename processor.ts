@@ -38,9 +38,17 @@ export function createDailyPlanProcessor(
       const editor = app.workspace.activeEditor?.editor;
       if (!editor) return;
 
+      // Save scroll position to prevent view jump
+      const scrollY = window.scrollY;
+
       // Serialize and write back
       const newYaml = serializeDailyPlanYaml(tasks);
       updateCodeBlock(editor, newYaml);
+
+      // Restore scroll after DOM rebuild
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollY);
+      });
     });
 
     // Register as a MarkdownRenderChild so Obsidian manages lifecycle

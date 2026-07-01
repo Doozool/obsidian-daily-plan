@@ -1,6 +1,7 @@
 /* ── Daily Plan Table ── */
 .daily-plan-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin: 8px 0;
   font-size: 14px;
@@ -16,6 +17,13 @@
   text-transform: uppercase;
 }
 
+.daily-plan-table th:nth-child(1) { width: auto; }
+.daily-plan-table th:nth-child(2) { width: 70px; }
+.daily-plan-table th:nth-child(3) { width: 70px; }
+.daily-plan-table th:nth-child(4) { width: 75px; }
+.daily-plan-table th:nth-child(5) { width: 45px; }
+.daily-plan-table th:nth-child(6) { width: 40px; }
+
 .daily-plan-table td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--table-border-color, #e0e0e0);
@@ -24,10 +32,12 @@
 
 /* ── Name cell (editable) ── */
 .name-cell {
-  min-width: 140px;
   cursor: text;
   border-radius: 3px;
   transition: background 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .name-cell:hover {

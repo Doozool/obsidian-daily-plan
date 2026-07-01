@@ -98,20 +98,11 @@ export function findCodeBlockRange(editor: Editor): {
 
 /**
  * Replace the content inside the first ```daily-plan code block
- * with the given YAML string, then scroll the block back into view.
+ * with the given YAML string.
  */
 export function updateCodeBlock(editor: Editor, newYaml: string): void {
   const range = findCodeBlockRange(editor);
   if (!range) return;
 
   editor.replaceRange(newYaml, range.start, range.end);
-
-  // Re-find and scroll to prevent view jump
-  const newRange = findCodeBlockRange(editor);
-  if (newRange) {
-    editor.scrollIntoView(
-      { from: newRange.start, to: newRange.start },
-      true
-    );
-  }
 }
