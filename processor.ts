@@ -36,6 +36,7 @@ export function createDailyPlanProcessor(
     // the correct block when the file has multiple daily-plan blocks.
     const sectionInfo = ctx.getSectionInfo(el);
     const blockLine = sectionInfo?.lineStart;
+    console.log("[daily-plan] sectionInfo:", JSON.stringify(sectionInfo), "blockLine:", blockLine, "source preview:", source.slice(0, 40));
 
     // Render interactive table + misc section
     const table = renderTable(
