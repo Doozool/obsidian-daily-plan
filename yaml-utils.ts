@@ -84,14 +84,14 @@ export function findCodeBlockRange(
   const lines = editor.getValue().split("\n");
 
   // Build a list of all daily-plan block ranges
+  // contentStart = line of opening marker (to match sectionInfo.lineStart)
+  // contentEnd   = line of closing ```
   const blocks: { contentStart: number; contentEnd: number }[] = [];
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith(BLOCK_MARKER)) {
+    if (lines[i].includes(BLOCK_MARKER)) {
       for (let j = i + 1; j < lines.length; j++) {
         if (lines[j] === BLOCK_END) {
-          // contentStart = first char of line after marker
-          // contentEnd   = beginning of closing ``` line
-          blocks.push({ contentStart: i + 1, contentEnd: j });
+          blocks.push({ contentStart: i, contentEnd: j });
           i = j;
           break;
         }
@@ -119,8 +119,9 @@ export function findCodeBlockRange(
     }
   }
 
+  // contentStart is the marker line; replacement starts on the next line
   return {
-    start: { line: block.contentStart, ch: 0 },
+    start: { line: block.contentStart + 1, ch: 0 },
     end: { line: block.contentEnd, ch: 0 },
   };
 }

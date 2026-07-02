@@ -3261,10 +3261,10 @@ function findCodeBlockRange(editor, nearLine) {
   const lines = editor.getValue().split("\n");
   const blocks = [];
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].startsWith(BLOCK_MARKER)) {
+    if (lines[i].includes(BLOCK_MARKER)) {
       for (let j = i + 1; j < lines.length; j++) {
         if (lines[j] === BLOCK_END) {
-          blocks.push({ contentStart: i + 1, contentEnd: j });
+          blocks.push({ contentStart: i, contentEnd: j });
           i = j;
           break;
         }
@@ -3288,7 +3288,7 @@ function findCodeBlockRange(editor, nearLine) {
     }
   }
   return {
-    start: { line: block.contentStart, ch: 0 },
+    start: { line: block.contentStart + 1, ch: 0 },
     end: { line: block.contentEnd, ch: 0 }
   };
 }
