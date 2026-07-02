@@ -3289,25 +3289,15 @@ function findCodeBlockRange(editor, nearLine) {
     return null;
   let block = blocks[0];
   if (nearLine !== void 0) {
-    console.log("[daily-plan] findCodeBlockRange: nearLine:", nearLine, "blocks:", JSON.stringify(blocks));
+    let bestDist = Infinity;
     for (const b of blocks) {
-      if (nearLine >= b.contentStart && nearLine <= b.contentEnd) {
+      const dist = Math.abs(nearLine - b.contentStart);
+      if (dist < bestDist) {
+        bestDist = dist;
         block = b;
-        console.log("[daily-plan] matched block:", JSON.stringify(b));
-        break;
       }
     }
-    if (nearLine < blocks[0].contentStart) {
-      block = blocks[0];
-      console.log("[daily-plan] fallback: before first block");
-    } else if (nearLine > blocks[blocks.length - 1].contentEnd) {
-      block = blocks[blocks.length - 1];
-      console.log("[daily-plan] fallback: after last block");
-    }
-  } else {
-    console.log("[daily-plan] findCodeBlockRange: nearLine is undefined, using first block");
   }
-  console.log("[daily-plan] selected block:", JSON.stringify(block));
   return {
     start: { line: block.contentStart + 1, ch: 0 },
     end: { line: block.contentEnd, ch: 0 }
@@ -3751,7 +3741,6 @@ function createDailyPlanProcessor(app) {
     }
     const sectionInfo = ctx.getSectionInfo(el);
     const blockLine = sectionInfo?.lineStart;
-    console.log("[daily-plan] sectionInfo:", JSON.stringify(sectionInfo), "blockLine:", blockLine, "source preview:", source.slice(0, 40));
     const table = renderTable(
       el,
       tasks,

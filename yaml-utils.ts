@@ -116,29 +116,18 @@ export function findCodeBlockRange(
 
   if (blocks.length === 0) return null;
 
-  // If nearLine is given, pick the block that contains it
+  // If nearLine is given, pick the block whose start is closest to it
   let block = blocks[0];
   if (nearLine !== undefined) {
-    console.log("[daily-plan] findCodeBlockRange: nearLine:", nearLine, "blocks:", JSON.stringify(blocks));
+    let bestDist = Infinity;
     for (const b of blocks) {
-      if (nearLine >= b.contentStart && nearLine <= b.contentEnd) {
+      const dist = Math.abs(nearLine - b.contentStart);
+      if (dist < bestDist) {
+        bestDist = dist;
         block = b;
-        console.log("[daily-plan] matched block:", JSON.stringify(b));
-        break;
       }
     }
-    // Fallback: if no block contains nearLine, use the last block
-    if (nearLine < blocks[0].contentStart) {
-      block = blocks[0];
-      console.log("[daily-plan] fallback: before first block");
-    } else if (nearLine > blocks[blocks.length - 1].contentEnd) {
-      block = blocks[blocks.length - 1];
-      console.log("[daily-plan] fallback: after last block");
-    }
-  } else {
-    console.log("[daily-plan] findCodeBlockRange: nearLine is undefined, using first block");
   }
-  console.log("[daily-plan] selected block:", JSON.stringify(block));
 
   // contentStart is the marker line; replacement starts on the next line
   return {
