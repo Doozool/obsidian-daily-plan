@@ -1,6 +1,6 @@
 import { dump, load } from "js-yaml";
 import { Editor, EditorPosition } from "obsidian";
-import type { DailyPlanData, Task, Session } from "./types";
+import type { DailyPlanData, Task, Session, MiscEntry } from "./types";
 
 const BLOCK_MARKER = "```daily-plan";
 const BLOCK_END = "```";
@@ -9,22 +9,22 @@ const BLOCK_END = "```";
  * Parse YAML source from a daily-plan code block.
  * Auto-migrates old {start, end} format to new {sessions} format.
  */
-export function parseDailyPlanYaml(source: string): Task[] {
+export function parseDailyPlanYaml(source: string): DailyPlanData {
   try {
-    const data = load(source) as { tasks?: unknown } | null;
+    const data = load(source) as { tasks?: unknown; misc?: unknown } | null;
+
+    const tasks: Task[] = [];
     if (data && Array.isArray(data.tasks)) {
-      return (data.tasks as Record<string, unknown>[]).map((t) => {
+      for (const t of data.tasks as Record<string, unknown>[]) {
         let sessions: Session[] = [];
 
         if (Array.isArray(t.sessions)) {
-          // New format: sessions array
           sessions = (t.sessions as Record<string, unknown>[]).map((s) => ({
             start: typeof s.start === "string" ? s.start : "",
             end: typeof s.end === "string" ? s.end : "",
             note: typeof s.note === "string" ? s.note : "",
           }));
         } else if (typeof t.start === "string" || typeof t.end === "string") {
-          // Old format: migrate single start/end to sessions
           sessions = [
             {
               start: typeof t.start === "string" ? t.start : "",
@@ -34,7 +34,6 @@ export function parseDailyPlanYaml(source: string): Task[] {
           ];
         }
 
-        // Ensure at least one empty session
         if (sessions.length === 0) {
           sessions = [{ start: "", end: "", note: "" }];
         }
@@ -44,21 +43,37 @@ export function parseDailyPlanYaml(source: string): Task[] {
         else if (t.done === "N") done = "N";
         else done = "";
 
-        return { name: typeof t.name === "string" ? t.name : "", sessions, done };
-      });
+        tasks.push({ name: typeof t.name === "string" ? t.name : "", sessions, done });
+      }
     }
-    return [];
+
+    const misc: MiscEntry[] = [];
+    if (data && Array.isArray(data.misc)) {
+      for (const m of data.misc as Record<string, unknown>[]) {
+        const done = typeof m.done === "boolean" ? m.done : m.done === "Y";
+        misc.push({
+          text: typeof m.text === "string" ? m.text : "",
+          done,
+        });
+      }
+    }
+
+    return { tasks, misc };
   } catch {
-    return [];
+    return { tasks: [], misc: [] };
   }
 }
 
 /**
- * Serialize an array of tasks to a YAML string with a `tasks:` key.
+ * Serialize tasks and misc to a YAML string.
+ * The `misc` key is omitted when the misc list is empty.
  */
-export function serializeDailyPlanYaml(tasks: Task[]): string {
-  const data: DailyPlanData = { tasks };
-  const yaml = dump(data, {
+export function serializeDailyPlanYaml(data: DailyPlanData): string {
+  const dumpData: Record<string, unknown> = { tasks: data.tasks };
+  if (data.misc.length > 0) {
+    dumpData.misc = data.misc;
+  }
+  const yaml = dump(dumpData, {
     indent: 2,
     lineWidth: -1,
     noRefs: true,

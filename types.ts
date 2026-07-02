@@ -10,8 +10,14 @@ export interface Task {
   done: "Y" | "N" | "";
 }
 
+export interface MiscEntry {
+  text: string;
+  done: boolean;
+}
+
 export interface DailyPlanData {
   tasks: Task[];
+  misc: MiscEntry[];
 }
 
 export interface DailyPlanSettings {

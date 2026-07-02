@@ -3208,8 +3208,9 @@ var BLOCK_END = "```";
 function parseDailyPlanYaml(source) {
   try {
     const data = load(source);
+    const tasks = [];
     if (data && Array.isArray(data.tasks)) {
-      return data.tasks.map((t) => {
+      for (const t of data.tasks) {
         let sessions = [];
         if (Array.isArray(t.sessions)) {
           sessions = t.sessions.map((s) => ({
@@ -3236,17 +3237,30 @@ function parseDailyPlanYaml(source) {
           done = "N";
         else
           done = "";
-        return { name: typeof t.name === "string" ? t.name : "", sessions, done };
-      });
+        tasks.push({ name: typeof t.name === "string" ? t.name : "", sessions, done });
+      }
     }
-    return [];
+    const misc = [];
+    if (data && Array.isArray(data.misc)) {
+      for (const m of data.misc) {
+        const done = typeof m.done === "boolean" ? m.done : m.done === "Y";
+        misc.push({
+          text: typeof m.text === "string" ? m.text : "",
+          done
+        });
+      }
+    }
+    return { tasks, misc };
   } catch {
-    return [];
+    return { tasks: [], misc: [] };
   }
 }
-function serializeDailyPlanYaml(tasks) {
-  const data = { tasks };
-  const yaml2 = dump(data, {
+function serializeDailyPlanYaml(data) {
+  const dumpData = { tasks: data.tasks };
+  if (data.misc.length > 0) {
+    dumpData.misc = data.misc;
+  }
+  const yaml2 = dump(dumpData, {
     indent: 2,
     lineWidth: -1,
     noRefs: true,
@@ -3370,7 +3384,7 @@ function hasAnyDuration(task) {
 }
 
 // table-renderer.ts
-function renderTable(container, tasks, onChange) {
+function renderTable(container, tasks, misc, onChange) {
   container.empty();
   const table = container.createEl("table", { cls: "daily-plan-table" });
   table.addEventListener("mousedown", (e) => {
@@ -3414,7 +3428,7 @@ function renderTable(container, tasks, onChange) {
           const newName = nameCell.getText().trim();
           if (newName !== task.name) {
             task.name = newName;
-            onChange(tasks);
+            onChange(tasks, misc);
           }
         });
       }
@@ -3426,7 +3440,7 @@ function renderTable(container, tasks, onChange) {
         e.stopPropagation();
         showTimePickerPopup(startCell, session.start, (val) => {
           session.start = val;
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       });
       const endCell = row.createEl("td", {
@@ -3437,7 +3451,7 @@ function renderTable(container, tasks, onChange) {
         e.stopPropagation();
         showTimePickerPopup(endCell, session.end, (val) => {
           session.end = val;
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       });
       const dur = computeDuration(session.start, session.end);
@@ -3485,7 +3499,7 @@ function renderTable(container, tasks, onChange) {
           const newNote = noteSpan.getText().trim();
           if (newNote !== session.note) {
             session.note = newNote;
-            onChange(tasks);
+            onChange(tasks, misc);
           }
         });
       }
@@ -3508,7 +3522,7 @@ function renderTable(container, tasks, onChange) {
           badge.addEventListener("click", (e) => {
             e.stopPropagation();
             task.done = task.done === "Y" ? "N" : "Y";
-            onChange(tasks);
+            onChange(tasks, misc);
           });
         }
       }
@@ -3525,7 +3539,7 @@ function renderTable(container, tasks, onChange) {
         } else {
           task.sessions.splice(sessIdx, 1);
         }
-        onChange(tasks);
+        onChange(tasks, misc);
       });
       if (isLast) {
         const addBtn2 = actCell.createEl("button", {
@@ -3536,7 +3550,7 @@ function renderTable(container, tasks, onChange) {
         addBtn2.addEventListener("click", (e) => {
           e.stopPropagation();
           task.sessions.push({ start: "", end: "", note: "" });
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       }
     });
@@ -3568,9 +3582,79 @@ function renderTable(container, tasks, onChange) {
       sessions: [{ start: "", end: "", note: "" }],
       done: ""
     });
-    onChange(tasks);
+    onChange(tasks, misc);
+  });
+  renderMiscSection(container, misc, (updatedMisc) => {
+    onChange(tasks, updatedMisc);
   });
   return table;
+}
+function renderMiscSection(container, misc, onChange) {
+  const section = container.createEl("div", { cls: "daily-plan-misc" });
+  const heading = section.createEl("h4", {
+    cls: "misc-heading",
+    text: "\u6742\u9879"
+  });
+  const list = section.createEl("div", { cls: "misc-list" });
+  function buildMiscItems() {
+    list.empty();
+    misc.forEach((item, idx) => {
+      const row = list.createEl("div", { cls: "misc-item" });
+      const checkbox = row.createEl("span", {
+        cls: `misc-checkbox ${item.done ? "is-done" : "is-undone"}`,
+        text: item.done ? "\u2713" : ""
+      });
+      checkbox.addEventListener("click", (e) => {
+        e.stopPropagation();
+        item.done = !item.done;
+        onChange(misc);
+      });
+      const textSpan = row.createEl("span", {
+        cls: "misc-text",
+        attr: { "data-placeholder": "\u6742\u9879\u2026" }
+      });
+      textSpan.setAttr("contenteditable", "true");
+      textSpan.setText(item.text);
+      textSpan.addEventListener(
+        "keydown",
+        (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            textSpan.blur();
+          }
+        },
+        true
+      );
+      textSpan.addEventListener("blur", () => {
+        const newText = textSpan.getText().trim();
+        if (newText !== item.text) {
+          item.text = newText;
+          onChange(misc);
+        }
+      });
+      const delBtn = row.createEl("button", {
+        cls: "misc-delete-btn",
+        text: "\xD7",
+        attr: { title: "\u5220\u9664\u6B64\u6742\u9879" }
+      });
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        misc.splice(idx, 1);
+        onChange(misc);
+      });
+    });
+  }
+  buildMiscItems();
+  const addBtn = section.createEl("button", {
+    cls: "add-misc-btn",
+    text: "+ \u6DFB\u52A0\u6742\u9879"
+  });
+  addBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    misc.push({ text: "", done: false });
+    onChange(misc);
+  });
 }
 function showTimePickerPopup(cell, currentValue, onSelect) {
   closeOpenPicker();
@@ -3637,19 +3721,27 @@ function closeOpenPicker() {
 // processor.ts
 function createDailyPlanProcessor(app) {
   return (source, el, ctx) => {
-    let tasks = parseDailyPlanYaml(source);
+    const data = parseDailyPlanYaml(source);
+    let tasks = data.tasks;
+    let misc = data.misc;
     if (tasks.length === 0 && source.trim().length > 0) {
     }
     const sectionInfo = ctx.getSectionInfo(el);
     const blockLine = sectionInfo?.lineStart;
-    const table = renderTable(el, tasks, (updatedTasks) => {
-      tasks = updatedTasks;
-      const editor = app.workspace.activeEditor?.editor;
-      if (!editor)
-        return;
-      const newYaml = serializeDailyPlanYaml(tasks);
-      updateCodeBlock(editor, newYaml, blockLine);
-    });
+    const table = renderTable(
+      el,
+      tasks,
+      misc,
+      (updatedTasks, updatedMisc) => {
+        tasks = updatedTasks;
+        misc = updatedMisc;
+        const editor = app.workspace.activeEditor?.editor;
+        if (!editor)
+          return;
+        const newYaml = serializeDailyPlanYaml({ tasks, misc });
+        updateCodeBlock(editor, newYaml, blockLine);
+      }
+    );
     const child = new import_obsidian2.MarkdownRenderChild(table);
     ctx.addChild(child);
   };

@@ -1,4 +1,4 @@
-import type { Task, Session } from "./types";
+import type { Task, Session, MiscEntry } from "./types";
 import {
   computeDuration,
   computeTaskMinutes,
@@ -9,13 +9,15 @@ import {
 } from "./time-utils";
 
 /**
- * Build an interactive daily-plan table inside `container`.
- * Every mutation calls `onChange(tasks)` so the caller can persist.
+ * Build an interactive daily-plan table inside `container`,
+ * followed by the misc section. Every mutation calls `onChange(tasks, misc)`
+ * so the caller can persist.
  */
 export function renderTable(
   container: HTMLElement,
   tasks: Task[],
-  onChange: (tasks: Task[]) => void
+  misc: MiscEntry[],
+  onChange: (tasks: Task[], misc: MiscEntry[]) => void
 ): HTMLElement {
   container.empty();
 
@@ -72,7 +74,7 @@ export function renderTable(
           const newName = nameCell.getText().trim();
           if (newName !== task.name) {
             task.name = newName;
-            onChange(tasks);
+            onChange(tasks, misc);
           }
         });
       }
@@ -86,7 +88,7 @@ export function renderTable(
         e.stopPropagation();
         showTimePickerPopup(startCell, session.start, (val) => {
           session.start = val;
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       });
 
@@ -99,7 +101,7 @@ export function renderTable(
         e.stopPropagation();
         showTimePickerPopup(endCell, session.end, (val) => {
           session.end = val;
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       });
 
@@ -154,7 +156,7 @@ export function renderTable(
           const newNote = noteSpan.getText().trim();
           if (newNote !== session.note) {
             session.note = newNote;
-            onChange(tasks);
+            onChange(tasks, misc);
           }
         });
       }
@@ -180,7 +182,7 @@ export function renderTable(
           badge.addEventListener("click", (e: MouseEvent) => {
             e.stopPropagation();
             task.done = task.done === "Y" ? "N" : "Y";
-            onChange(tasks);
+            onChange(tasks, misc);
           });
         }
       }
@@ -201,7 +203,7 @@ export function renderTable(
         } else {
           task.sessions.splice(sessIdx, 1);
         }
-        onChange(tasks);
+        onChange(tasks, misc);
       });
 
       // Add-session button (only on last row)
@@ -214,7 +216,7 @@ export function renderTable(
         addBtn.addEventListener("click", (e: MouseEvent) => {
           e.stopPropagation();
           task.sessions.push({ start: "", end: "", note: "" });
-          onChange(tasks);
+          onChange(tasks, misc);
         });
       }
     });
@@ -254,10 +256,107 @@ export function renderTable(
       sessions: [{ start: "", end: "", note: "" }],
       done: "",
     });
-    onChange(tasks);
+    onChange(tasks, misc);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Misc section — render below the table
+  // ---------------------------------------------------------------------------
+  renderMiscSection(container, misc, (updatedMisc: MiscEntry[]) => {
+    onChange(tasks, updatedMisc);
   });
 
   return table;
+}
+
+/**
+ * Render the "杂项" section (misc items) below the main table.
+ * Only renders when misc is non-empty; otherwise clears any existing section.
+ */
+function renderMiscSection(
+  container: HTMLElement,
+  misc: MiscEntry[],
+  onChange: (misc: MiscEntry[]) => void
+): void {
+  // Build misc section container
+  const section = container.createEl("div", { cls: "daily-plan-misc" });
+
+  const heading = section.createEl("h4", {
+    cls: "misc-heading",
+    text: "杂项",
+  });
+
+  const list = section.createEl("div", { cls: "misc-list" });
+
+  function buildMiscItems(): void {
+    list.empty();
+
+    misc.forEach((item, idx) => {
+      const row = list.createEl("div", { cls: "misc-item" });
+
+      // Done checkbox
+      const checkbox = row.createEl("span", {
+        cls: `misc-checkbox ${item.done ? "is-done" : "is-undone"}`,
+        text: item.done ? "✓" : "",
+      });
+      checkbox.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        item.done = !item.done;
+        onChange(misc);
+      });
+
+      // Editable text
+      const textSpan = row.createEl("span", {
+        cls: "misc-text",
+        attr: { "data-placeholder": "杂项…" },
+      });
+      textSpan.setAttr("contenteditable", "true");
+      textSpan.setText(item.text);
+      textSpan.addEventListener(
+        "keydown",
+        (e: KeyboardEvent) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.stopPropagation();
+            textSpan.blur();
+          }
+        },
+        true
+      );
+      textSpan.addEventListener("blur", () => {
+        const newText = textSpan.getText().trim();
+        if (newText !== item.text) {
+          item.text = newText;
+          onChange(misc);
+        }
+      });
+
+      // Delete button
+      const delBtn = row.createEl("button", {
+        cls: "misc-delete-btn",
+        text: "×",
+        attr: { title: "删除此杂项" },
+      });
+      delBtn.addEventListener("click", (e: MouseEvent) => {
+        e.stopPropagation();
+        misc.splice(idx, 1);
+        onChange(misc);
+      });
+    });
+  }
+
+  buildMiscItems();
+
+  // Add misc item button
+  const addBtn = section.createEl("button", {
+    cls: "add-misc-btn",
+    text: "+ 添加杂项",
+  });
+  addBtn.addEventListener("click", (e: MouseEvent) => {
+    e.stopPropagation();
+    misc.push({ text: "", done: false });
+    onChange(misc);
+  });
 }
 
 // ---------------------------------------------------------------------------
