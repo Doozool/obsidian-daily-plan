@@ -72,46 +72,77 @@ export function serializeDailyPlanYaml(tasks: Task[]): string {
 }
 
 /**
- * Find the range (start and end positions) of the first ```daily-plan
- * code block in the editor. Returns null if no block is found.
+ * Find the range (start and end positions) of a ```daily-plan
+ * code block in the editor. When `nearLine` is provided, finds
+ * the block that contains that line; otherwise returns the first block.
+ * Returns null if no block is found.
  */
-export function findCodeBlockRange(editor: Editor): {
-  start: EditorPosition;
-  end: EditorPosition;
-} | null {
-  const content = editor.getValue();
-  const startIdx = content.indexOf(BLOCK_MARKER);
+export function findCodeBlockRange(
+  editor: Editor,
+  nearLine?: number
+): { start: EditorPosition; end: EditorPosition } | null {
+  const lines = editor.getValue().split("\n");
 
-  if (startIdx === -1) return null;
+  // Build a list of all daily-plan block ranges
+  const blocks: { contentStart: number; contentEnd: number }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(BLOCK_MARKER)) {
+      for (let j = i + 1; j < lines.length; j++) {
+        if (lines[j] === BLOCK_END) {
+          // contentStart = first char of line after marker
+          // contentEnd   = beginning of closing ``` line
+          blocks.push({ contentStart: i + 1, contentEnd: j });
+          i = j;
+          break;
+        }
+      }
+    }
+  }
 
-  const contentStart = content.indexOf("\n", startIdx);
-  if (contentStart === -1) return null;
+  if (blocks.length === 0) return null;
 
-  const endIdx = content.indexOf("\n" + BLOCK_END, contentStart);
-  if (endIdx === -1) return null;
+  // If nearLine is given, pick the block that contains it
+  let block = blocks[0];
+  if (nearLine !== undefined) {
+    for (const b of blocks) {
+      if (nearLine >= b.contentStart && nearLine <= b.contentEnd) {
+        block = b;
+        break;
+      }
+    }
+    // Fallback: if no block contains nearLine, use the last block
+    // (user is likely editing below existing blocks)
+    if (nearLine < blocks[0].contentStart) {
+      block = blocks[0];
+    } else if (nearLine > blocks[blocks.length - 1].contentEnd) {
+      block = blocks[blocks.length - 1];
+    }
+  }
 
   return {
-    start: editor.offsetToPos(contentStart + 1),
-    end: editor.offsetToPos(endIdx + 1),
+    start: { line: block.contentStart, ch: 0 },
+    end: { line: block.contentEnd, ch: 0 },
   };
 }
 
 /**
- * Replace the content inside the first ```daily-plan code block
- * with the given YAML string, then scroll back to keep it in view.
+ * Replace the content inside a ```daily-plan code block with the given
+ * YAML string. Uses `nearLine` to target the correct block when the file
+ * contains multiple daily-plan blocks.
  */
-export function updateCodeBlock(editor: Editor, newYaml: string): void {
-  const range = findCodeBlockRange(editor);
+export function updateCodeBlock(
+  editor: Editor,
+  newYaml: string,
+  nearLine?: number
+): void {
+  // Save scroll position before mutation
+  const scrollY = window.scrollY;
+
+  const range = findCodeBlockRange(editor, nearLine);
   if (!range) return;
 
   editor.replaceRange(newYaml, range.start, range.end);
 
-  // Re-find and scroll to prevent view jump
-  const newRange = findCodeBlockRange(editor);
-  if (newRange) {
-    editor.scrollIntoView(
-      { from: newRange.start, to: newRange.start },
-      true
-    );
-  }
+  // Restore scroll position (avoid jump caused by content height change)
+  window.scrollTo(0, scrollY);
 }

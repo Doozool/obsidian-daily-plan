@@ -30,6 +30,11 @@ export function createDailyPlanProcessor(
       // rather than showing raw YAML (user can fix via the table)
     }
 
+    // Capture the line number of this code block so write-backs target
+    // the correct block when the file has multiple daily-plan blocks.
+    const sectionInfo = ctx.getSectionInfo(el);
+    const blockLine = sectionInfo?.lineStart;
+
     // Render interactive table
     const table = renderTable(el, tasks, (updatedTasks: Task[]) => {
       tasks = updatedTasks;
@@ -40,7 +45,7 @@ export function createDailyPlanProcessor(
 
       // Serialize and write back
       const newYaml = serializeDailyPlanYaml(tasks);
-      updateCodeBlock(editor, newYaml);
+      updateCodeBlock(editor, newYaml, blockLine);
     });
 
     // Register as a MarkdownRenderChild so Obsidian manages lifecycle

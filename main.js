@@ -3257,34 +3257,48 @@ function serializeDailyPlanYaml(tasks) {
   result = result.replace(/done: "([YN])"/g, "done: $1");
   return result;
 }
-function findCodeBlockRange(editor) {
-  const content = editor.getValue();
-  const startIdx = content.indexOf(BLOCK_MARKER);
-  if (startIdx === -1)
+function findCodeBlockRange(editor, nearLine) {
+  const lines = editor.getValue().split("\n");
+  const blocks = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith(BLOCK_MARKER)) {
+      for (let j = i + 1; j < lines.length; j++) {
+        if (lines[j] === BLOCK_END) {
+          blocks.push({ contentStart: i + 1, contentEnd: j });
+          i = j;
+          break;
+        }
+      }
+    }
+  }
+  if (blocks.length === 0)
     return null;
-  const contentStart = content.indexOf("\n", startIdx);
-  if (contentStart === -1)
-    return null;
-  const endIdx = content.indexOf("\n" + BLOCK_END, contentStart);
-  if (endIdx === -1)
-    return null;
+  let block = blocks[0];
+  if (nearLine !== void 0) {
+    for (const b of blocks) {
+      if (nearLine >= b.contentStart && nearLine <= b.contentEnd) {
+        block = b;
+        break;
+      }
+    }
+    if (nearLine < blocks[0].contentStart) {
+      block = blocks[0];
+    } else if (nearLine > blocks[blocks.length - 1].contentEnd) {
+      block = blocks[blocks.length - 1];
+    }
+  }
   return {
-    start: editor.offsetToPos(contentStart + 1),
-    end: editor.offsetToPos(endIdx + 1)
+    start: { line: block.contentStart, ch: 0 },
+    end: { line: block.contentEnd, ch: 0 }
   };
 }
-function updateCodeBlock(editor, newYaml) {
-  const range = findCodeBlockRange(editor);
+function updateCodeBlock(editor, newYaml, nearLine) {
+  const scrollY = window.scrollY;
+  const range = findCodeBlockRange(editor, nearLine);
   if (!range)
     return;
   editor.replaceRange(newYaml, range.start, range.end);
-  const newRange = findCodeBlockRange(editor);
-  if (newRange) {
-    editor.scrollIntoView(
-      { from: newRange.start, to: newRange.start },
-      true
-    );
-  }
+  window.scrollTo(0, scrollY);
 }
 
 // time-utils.ts
@@ -3626,13 +3640,15 @@ function createDailyPlanProcessor(app) {
     let tasks = parseDailyPlanYaml(source);
     if (tasks.length === 0 && source.trim().length > 0) {
     }
+    const sectionInfo = ctx.getSectionInfo(el);
+    const blockLine = sectionInfo?.lineStart;
     const table = renderTable(el, tasks, (updatedTasks) => {
       tasks = updatedTasks;
       const editor = app.workspace.activeEditor?.editor;
       if (!editor)
         return;
       const newYaml = serializeDailyPlanYaml(tasks);
-      updateCodeBlock(editor, newYaml);
+      updateCodeBlock(editor, newYaml, blockLine);
     });
     const child = new import_obsidian2.MarkdownRenderChild(table);
     ctx.addChild(child);
@@ -3674,18 +3690,10 @@ var DailyPlanPlugin = class extends import_obsidian3.Plugin {
     await this.saveData(this.settings);
   }
   /**
-   * If the file already has a ```daily-plan block, scroll to the first one.
-   * Otherwise, insert a new template at cursor position.
+   * Always insert a new daily-plan template at the cursor position,
+   * regardless of whether the file already has other daily-plan blocks.
    */
   insertOrScrollToDailyPlan(editor) {
-    const content = editor.getValue();
-    const markerIndex = content.indexOf("```daily-plan");
-    if (markerIndex !== -1) {
-      const pos = editor.offsetToPos(markerIndex);
-      editor.setCursor(pos);
-      editor.scrollIntoView({ from: pos, to: pos }, true);
-      return;
-    }
     const today = /* @__PURE__ */ new Date();
     const dateStr = this.formatDate(today);
     const dayName = DAY_NAMES[today.getDay()];

@@ -48,22 +48,10 @@ export default class DailyPlanPlugin extends Plugin {
   }
 
   /**
-   * If the file already has a ```daily-plan block, scroll to the first one.
-   * Otherwise, insert a new template at cursor position.
+   * Always insert a new daily-plan template at the cursor position,
+   * regardless of whether the file already has other daily-plan blocks.
    */
   private insertOrScrollToDailyPlan(editor: Editor): void {
-    const content = editor.getValue();
-    const markerIndex = content.indexOf("```daily-plan");
-
-    if (markerIndex !== -1) {
-      // Block exists — scroll to it
-      const pos = editor.offsetToPos(markerIndex);
-      editor.setCursor(pos);
-      editor.scrollIntoView({ from: pos, to: pos }, true);
-      return;
-    }
-
-    // No block — insert template at cursor
     const today = new Date();
     const dateStr = this.formatDate(today);
     const dayName = DAY_NAMES[today.getDay()];
@@ -74,7 +62,7 @@ export default class DailyPlanPlugin extends Plugin {
     const cursor = editor.getCursor();
     editor.replaceRange(template, cursor);
 
-    // Place cursor after the code block so it renders as a table immediately
+    // Place cursor after the code block so Obsidian renders it as a table
     const endPos = editor.offsetToPos(editor.posToOffset(cursor) + template.length);
     editor.setCursor(endPos);
   }
