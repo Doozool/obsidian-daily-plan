@@ -3310,27 +3310,7 @@ function updateCodeBlock(editor, newYaml, nearLine) {
   const range = findCodeBlockRange(editor, nearLine);
   if (!range)
     return;
-  const scrollY = window.scrollY;
-  const cmScroller = document.querySelector(".cm-scroller");
-  const cmScrollTop = cmScroller ? cmScroller.scrollTop : 0;
-  let settling = true;
-  let settleTimer = null;
-  function lockScroll() {
-    if (!settling)
-      return;
-    window.scrollTo(0, scrollY);
-    if (cmScroller)
-      cmScroller.scrollTop = cmScrollTop;
-  }
-  window.addEventListener("scroll", lockScroll, { passive: false });
   editor.replaceRange(newYaml, range.start, range.end);
-  settleTimer = setTimeout(() => {
-    settling = false;
-    window.removeEventListener("scroll", lockScroll);
-    window.scrollTo(0, scrollY);
-    if (cmScroller)
-      cmScroller.scrollTop = cmScrollTop;
-  }, 150);
 }
 
 // time-utils.ts
