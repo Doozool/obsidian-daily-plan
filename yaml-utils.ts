@@ -151,8 +151,36 @@ export function updateCodeBlock(
   newYaml: string,
   nearLine?: number
 ): void {
+  // Find Obsidian's actual scroll container (NOT window — Electron uses
+  // internal divs for scrolling) and save its scroll position
+  const table = document.querySelector(".daily-plan-table");
+  const scroller = findScrollContainer(table);
+  const scrollTop = scroller ? scroller.scrollTop : 0;
+
   const range = findCodeBlockRange(editor, nearLine);
   if (!range) return;
 
   editor.replaceRange(newYaml, range.start, range.end);
+
+  // Restore scroll after Obsidian re-renders the code block
+  if (scroller && scrollTop > 0) {
+    requestAnimationFrame(() => {
+      scroller.scrollTop = scrollTop;
+    });
+  }
+}
+
+/**
+ * Walk up from `el` to find the nearest scrollable ancestor.
+ * In Obsidian's reading mode this is typically .markdown-preview-view.
+ */
+function findScrollContainer(el: Element | null): HTMLElement | null {
+  while (el) {
+    const s = getComputedStyle(el);
+    if (s.overflowY === "auto" || s.overflowY === "scroll") {
+      return el as HTMLElement;
+    }
+    el = el.parentElement;
+  }
+  return null;
 }

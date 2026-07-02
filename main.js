@@ -3307,10 +3307,28 @@ function findCodeBlockRange(editor, nearLine) {
   };
 }
 function updateCodeBlock(editor, newYaml, nearLine) {
+  const table = document.querySelector(".daily-plan-table");
+  const scroller = findScrollContainer(table);
+  const scrollTop = scroller ? scroller.scrollTop : 0;
   const range = findCodeBlockRange(editor, nearLine);
   if (!range)
     return;
   editor.replaceRange(newYaml, range.start, range.end);
+  if (scroller && scrollTop > 0) {
+    requestAnimationFrame(() => {
+      scroller.scrollTop = scrollTop;
+    });
+  }
+}
+function findScrollContainer(el) {
+  while (el) {
+    const s = getComputedStyle(el);
+    if (s.overflowY === "auto" || s.overflowY === "scroll") {
+      return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
 }
 
 // time-utils.ts
