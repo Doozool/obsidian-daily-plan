@@ -159,6 +159,11 @@ export function updateCodeBlock(
 
   editor.replaceRange(newYaml, range.start, range.end);
 
-  // Restore scroll position (avoid jump caused by content height change)
-  window.scrollTo(0, scrollY);
+  // Double rAF: wait for Obsidian to re-render the code block
+  // and the browser to complete layout, then restore scroll position
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
+  });
 }

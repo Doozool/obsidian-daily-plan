@@ -3312,7 +3312,11 @@ function updateCodeBlock(editor, newYaml, nearLine) {
   if (!range)
     return;
   editor.replaceRange(newYaml, range.start, range.end);
-  window.scrollTo(0, scrollY);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo(0, scrollY);
+    });
+  });
 }
 
 // time-utils.ts
