@@ -151,19 +151,34 @@ export function updateCodeBlock(
   newYaml: string,
   nearLine?: number
 ): void {
-  // Save scroll position before mutation
-  const scrollY = window.scrollY;
-
   const range = findCodeBlockRange(editor, nearLine);
   if (!range) return;
 
+  // Freeze the current scroll position and intercept any scroll events
+  // that Obsidian might trigger during code block re-render
+  const scrollY = window.scrollY;
+  const cmScroller = document.querySelector(".cm-scroller") as HTMLElement | null;
+  const cmScrollTop = cmScroller ? cmScroller.scrollTop : 0;
+
+  let settling = true;
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function lockScroll(): void {
+    if (!settling) return;
+    window.scrollTo(0, scrollY);
+    if (cmScroller) cmScroller.scrollTop = cmScrollTop;
+  }
+
+  window.addEventListener("scroll", lockScroll, { passive: false });
+
   editor.replaceRange(newYaml, range.start, range.end);
 
-  // Double rAF: wait for Obsidian to re-render the code block
-  // and the browser to complete layout, then restore scroll position
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      window.scrollTo(0, scrollY);
-    });
-  });
+  // Unlock after a generous delay — Obsidian should be done re-rendering by then
+  settleTimer = setTimeout(() => {
+    settling = false;
+    window.removeEventListener("scroll", lockScroll);
+    // Final precise restoration
+    window.scrollTo(0, scrollY);
+    if (cmScroller) cmScroller.scrollTop = cmScrollTop;
+  }, 150);
 }
